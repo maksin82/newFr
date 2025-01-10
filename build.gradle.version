@@ -1,0 +1,97 @@
+plugins {
+    id 'java'
+    id 'checkstyle'
+    id('io.freefair.lombok') version '8.11'
+    id('org.gradle.test-retry') version '1.5.3'
+}
+
+group = 'com.unitybank'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.puppycrawl.tools:checkstyle:10.21.0'
+    implementation 'org.junit.platform:junit-platform-launcher:1.7.0'
+    implementation 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    implementation 'org.junit.jupiter:junit-jupiter-params:5.7.0'
+    implementation 'org.assertj:assertj-core:3.19.0'
+    implementation 'org.seleniumhq.selenium:selenium-java:4.0.0-beta-1'
+    implementation 'com.typesafe:config:1.4.1'
+    implementation 'org.aspectj:aspectjrt:1.9.6'
+    implementation 'io.rest-assured:rest-assured:5.4.0'
+    implementation 'org.postgresql:postgresql:42.6.0'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc:3.4.0'
+    implementation 'io.github.bonigarcia:webdrivermanager:5.7.0'
+
+    testImplementation 'org.assertj:assertj-core:3.11.1'
+    testImplementation 'io.rest-assured:rest-assured:5.3.0'
+    testImplementation 'io.rest-assured:json-schema-validator:5.3.0'
+    testImplementation 'io.qameta.allure:allure-rest-assured:2.8.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.10.4'
+    testImplementation 'com.fasterxml.jackson.core:jackson-core:2.10.4'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.10.4'
+
+    implementation 'com.puppycrawl.tools:checkstyle:10.21.0'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test) {
+    useJUnitPlatform()
+
+    testLogging {
+        events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+        exceptionFormat = 'FULL'
+    }
+
+    retry {
+        maxRetries = 2
+    }
+}
+
+tasks.register('apitests', Test) {
+    include('api/**/*.class')
+
+    testClassesDirs = files('test-api-ui/build/classes/java/test')
+    classpath = files('test-api-ui/build/classes/java/test', 'test-api-ui/build/resources/test')
+}
+
+tasks.register('webtests', Test) {
+    include('web/**/*.class')
+
+    testClassesDirs = files('test-api-ui/build/classes/java/test')
+    classpath = files('test-api-ui/build/classes/java/test', 'test-api-ui/build/resources/test')
+}
+
+tasks.register('regress', Test) {
+    dependsOn tasks['apitests']
+    dependsOn tasks['webtests']
+    onlyIf { System.getenv('STAND') != 'Production' }
+    useJUnitPlatform {
+        includeTags 'regress'
+    }
+}
+
+//    tasks.named('webtests') {
+//        mustRunAfter tasks['apitests']
+//    }
+
+sourceSets.main.java.srcDirs += 'src/java'
+
+checkstyle {
+    toolVersion = '10.21.0'
+    configFile = file('config/checkstyle/checkstyle.xml')
+}
+
+tasks.withType(Checkstyle) {
+    reports {
+        xml.required = false
+        html.required = true
+        html.stylesheet = resources.text.fromFile('config/xsl/checkstyle-custom.xsl')
+    }
+}
